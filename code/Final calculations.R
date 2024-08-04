@@ -21,19 +21,19 @@ library(summarytools)
 #-------------------------------------------------------------------------------
   
 # read data 2018
-all_data2018 <- read.csv("daF3482-2018.csv", sep = ";")
+all_data2018 <- read.csv("../data/daF3482-2018.csv", sep = ";")
   
 # read data 2019
-all_data2019 <- read.csv("daF3493-2019.csv", sep = ";")
+all_data2019 <- read.csv("../data/daF3493-2019.csv", sep = ";")
   
 # read data 2020
-all_data2020 <- read.csv("daF3645-2020.csv", sep = ";")
+all_data2020 <- read.csv("../data/daF3645-2020.csv", sep = ";")
   
 # read data 2021
-all_data2021 <- read.csv("daF3727-2021.csv", sep = ";")
+all_data2021 <- read.csv("../data/daF3727-2021.csv", sep = ";")
   
 # read data 2022
-all_data2022 <- read.csv("daF3784-2022.csv", sep = ";")
+all_data2022 <- read.csv("../data/daF3784-2022.csv", sep = ";")
   
 #-------------------------------------------------------------------------------
     
@@ -301,7 +301,7 @@ summary(data$work_complexity)   # mean: 0.4711
 
 
 # save data
-write.table(data, file = "final_data.txt", row.names = FALSE, sep = ',')
+write.table(data, file = "../data/final_data.txt", row.names = FALSE, sep = ',')
 
 #-------------------------------------------------------------------------------
   
@@ -436,11 +436,11 @@ ggplot(means, aes(x=year, group=1)) +
 
 
 # read register data 
-register2022 <- read.csv("register2022.csv", sep = ',')
-register2021 <- read.csv("register2021.csv", sep = ',')
-register2020 <- read.csv("register2020.csv", sep = ',')
-register2019 <- read.csv("register2019.csv", sep = ',')
-register2018 <- read.csv("register2018.csv", sep = ',')
+register2022 <- read.csv("../data/register2022.csv", sep = ',')
+register2021 <- read.csv("../data/register2021.csv", sep = ',')
+register2020 <- read.csv("../data/register2020.csv", sep = ',')
+register2019 <- read.csv("../data/register2019.csv", sep = ',')
+register2018 <- read.csv("../data/register2018.csv", sep = ',')
 
 register <- dplyr::bind_rows(register2018, register2019, register2020, register2021, register2022)
 
@@ -456,7 +456,7 @@ register_long <- register_long %>%
 
 
 register_long <- register_long %>%
-  mutate(Population.percent = Gender.count/Population.size*100)
+  mutate(Population.proportion = Gender.count/Population.size)
 
 #-------------------------------------------------------------------------------
 
@@ -505,11 +505,30 @@ sample_long <- sample_long %>%
                                  Year == '2022' ~ nrow(cdata2022)))
 
 sample_long <- sample_long %>%
-  mutate(sample.percent = gender.count/sample.size*100)
+  mutate(gender.group = gender.group %>%
+           factor() %>%
+           fct_recode("Males" = "males",
+                      "Females" = "females"))
+sample_long <- sample_long %>% rename(Gender.group = gender.group)
+
+merged_sample <- merge(register_long, sample_long)
+
+merged_sample$weight <- merged_sample$Population.proportion/merged_sample$gender.count
 
 
-sample_long$weight <- register_long$Population.percent/sample_long$sample.percent
+
+#----------------------------------------------------
+
+weight <- merged_sample[c(1, 2, 3, 9)]
+
+weight <- weight %>%
+  mutate(Gender.group = Gender.group %>%
+           factor() %>%
+           fct_recode("1" = "Males",
+                      "2" = "Females"))
 
 
-
+data <- merge(data, weight,
+              by.x = c("sukup", "lisco_1", "year"),
+              by.y = c("Gender.group", "Occupational.group", "Year"))
             
