@@ -303,8 +303,142 @@ summary(data$work_complexity)   # mean: 0.4711
 # save data
 write.table(data, file = "../data/final_data.txt", row.names = FALSE, sep = ',')
 
+
 #-------------------------------------------------------------------------------
-  
+
+# weighting data
+
+
+# read register data 
+register2022 <- read.csv("../data/register2022.csv", sep = ',')
+register2021 <- read.csv("../data/register2021.csv", sep = ',')
+register2020 <- read.csv("../data/register2020.csv", sep = ',')
+register2019 <- read.csv("../data/register2019.csv", sep = ',')
+register2018 <- read.csv("../data/register2018.csv", sep = ',')
+
+register <- dplyr::bind_rows(register2018, register2019, register2020, register2021, register2022)
+
+register_long <- register %>%
+  pivot_longer(cols = c('Males', 'Females'), names_to = "Gender.group", values_to = "Joint")
+
+register_long <- register_long %>%
+  mutate(Population.size = case_when(Year == '2018' ~ 2135347,
+                                     Year == '2019' ~ 2133398,
+                                     Year == '2020' ~ 2046297,
+                                     Year == '2021' ~ 2133908,
+                                     Year == '2022' ~ 2180180))
+
+
+register_long <- register_long %>%
+  mutate(Population.proportion = Joint/Population.size)
+
+
+
+
+# save the output of cross-tabulation of 'occupation' and 'gender'
+cross_class2018 <- as.data.frame(unclass(table(cdata2018$lisco_1, cdata2018$sukup)))
+colnames(cross_class2018) <- c('males', 'females')
+cross_class2018$Occupational.group <- rownames(cross_class2018)
+cross_class2018$Year <- 2018
+
+cross_class2019 <- as.data.frame(unclass(table(cdata2019$lisco_1, cdata2019$sukup)))
+colnames(cross_class2019) <- c('males', 'females')
+cross_class2019$Occupational.group <- rownames(cross_class2019)
+cross_class2019$Year <- 2019
+
+
+cross_class2020 <- as.data.frame(unclass(table(cdata2020$lisco_1, cdata2020$sukup)))
+colnames(cross_class2020) <- c('males', 'females')
+cross_class2020$Occupational.group <- rownames(cross_class2020)
+cross_class2020$Year <- 2020
+
+
+cross_class2021 <- as.data.frame(unclass(table(cdata2021$lisco_1, cdata2021$sukup)))
+colnames(cross_class2021) <- c('males', 'females')
+cross_class2021$Occupational.group <- rownames(cross_class2021)
+cross_class2021$Year <- 2021
+
+
+cross_class2022 <- as.data.frame(unclass(table(cdata2022$lisco_1, cdata2022$sukup)))
+colnames(cross_class2022) <- c('males', 'females')
+cross_class2022$Occupational.group <- rownames(cross_class2022)
+cross_class2022$Year <- 2022
+
+
+sample <- dplyr::bind_rows(cross_class2018, cross_class2019, cross_class2020, cross_class2021, cross_class2022)
+
+sample_long <- sample %>%
+  pivot_longer(cols = c('males', 'females'), names_to = "gender.group", values_to = "joint")
+
+
+sample_long <- sample_long %>%
+  mutate(sample.size = case_when(Year == '2018' ~ nrow(cdata2018),
+                                 Year == '2019' ~ nrow(cdata2019),
+                                 Year == '2020' ~ nrow(cdata2020),
+                                 Year == '2021' ~ nrow(cdata2021),
+                                 Year == '2022' ~ nrow(cdata2022)))
+
+sample_long <- sample_long %>%
+  mutate(gender.group = gender.group %>%
+           factor() %>%
+           fct_recode("Males" = "males",
+                      "Females" = "females"))
+sample_long <- sample_long %>% rename(Gender.group = gender.group)
+
+merged_sample <- merge(register_long, sample_long)
+
+merged_sample$weight <- merged_sample$Population.proportion/merged_sample$joint
+
+
+
+
+weight <- merged_sample[c(1, 2, 3, 9)]
+
+weight <- weight %>%
+  mutate(Gender.group = Gender.group %>%
+           factor() %>%
+           fct_recode("1" = "Males",
+                      "2" = "Females"))
+
+
+data <- merge(data, weight,
+              by.x = c("sukup", "lisco_1", "year"),
+              by.y = c("Gender.group", "Occupational.group", "Year"))
+
+
+#-------------------------------------------------------------------------------
+
+# calculate work complexity with weight
+data$weighted_autonomy <- data$autonomy*data$weight
+
+data %>% 
+  group_by(year) %>%
+  summarise(weighted_autonomy_sum = sum(weighted_autonomy, na.rm=TRUE))
+
+
+data$weighted_skill_building <- data$skill_building*data$weight
+
+data %>% 
+  group_by(year) %>%
+  summarise(weighted_sb_sum = sum(weighted_skill_building, na.rm=TRUE))
+
+
+data$weighted_collaborative_work <- data$collaborative_work*data$weight
+
+data %>% 
+  group_by(year) %>%
+  summarise(weighted_cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+
+      
+data$weighted_work_complexity <- rowMeans(data[,35:37], na.rm = TRUE)
+
+data %>% 
+  group_by(year) %>%
+  summarise(weighted_wc_sum = sum(weighted_work_complexity, na.rm=TRUE))
+
+#-------------------------------------------------------------------------------
+
+
 # autonomy and skill_building
 auto_skill <-cor.test(data$autonomy, data$skill_building,  
                         method = "spearman")
@@ -401,7 +535,7 @@ semPaths(fit, style = "lisrel")
 vis_data <- cor(data[9:17])
 corrplot(vis_data, method = 'square', order = 'FPC', type = 'upper', diag = FALSE,
          tl.cex = 0.7, tl.col = "black")
-
+#-------------------------------------------------------------------------------
 
 means <- data %>%
   group_by(year) %>%
@@ -430,105 +564,55 @@ ggplot(means, aes(x=year, group=1)) +
   labs(x="Year", y = "Average")
 
 
+
+sums <- data %>%
+  group_by(year) %>%
+  summarise(work_complexity=sum(weighted_work_complexity, na.rm=TRUE),
+            collaborative_work=sum(weighted_collaborative_work, na.rm=TRUE),
+            skill_building=sum(weighted_skill_building, na.rm=TRUE),
+            autonomy=sum(weighted_autonomy, na.rm=TRUE))
+
+
+line_thickness = 0.75
+point_size = 2
+
+ggplot(sums, aes(x=year, group=1)) +
+  geom_line(aes(y=work_complexity, color="Work complexity"), size=line_thickness) +
+  geom_point(aes(y=work_complexity, color="Work complexity"), size=point_size) +
+  geom_line(aes(y=collaborative_work, color="Collaborative work"), size=line_thickness) +
+  geom_point(aes(y=collaborative_work, color="Collaborative work"), size=point_size) +
+  geom_line(aes(y=skill_building, color="Continuous skill-building"),size=line_thickness)+
+  geom_point(aes(y=skill_building, color="Continuous skill-building"), size=point_size) +
+  geom_line(aes(y=autonomy, color="Level of autonomy"), size=line_thickness) +
+  geom_point(aes(y=autonomy, color="Level of autonomy"), size=point_size) +
+  scale_color_manual(name = "", values = c("Work complexity" = 'black',
+                                           "Collaborative work" = 'darkblue',
+                                           "Continuous skill-building" = 'darkgreen',
+                                           "Level of autonomy" = 'orange')) +
+  labs(x="Year", y = "Average")
+
+data %>% 
+group_by(lisco_1) %>%
+summarise(Sum_test = sum(weighted_work_complexity, na.rm=TRUE))
+
+
+ggplot(data, aes(x=work_complexity)) +
+  geom_histogram(color="black", fill = "gray") +
+  labs(x="Work complexity", y = "Frequency")
+
+
+ggplot(data, aes(x = year, y = work_complexity, color = year)) +
+  geom_boxplot(colour = "#1F3552", fill = "#4271AE", alpha = 0.7, width = 0.5) +
+  stat_summary(fun = mean, geom = "pointrange", shape = 18, size = 0.9, 
+               color = "darkorange", fill = "darkorange") +
+  labs(x="Year", y = "Work complexity") +
+  geom_text(data = means, aes(x = group, y = mean_value + 0.2, label = round(mean_value, 2)))
+
 #-------------------------------------------------------------------------------
 
-# weighting data
+# regression analysis
+a <- lm(work_complexity ~ as_factor(sukup) + as_factor(age), data = data, weight = weight)
+      
+summary(a)
 
 
-# read register data 
-register2022 <- read.csv("../data/register2022.csv", sep = ',')
-register2021 <- read.csv("../data/register2021.csv", sep = ',')
-register2020 <- read.csv("../data/register2020.csv", sep = ',')
-register2019 <- read.csv("../data/register2019.csv", sep = ',')
-register2018 <- read.csv("../data/register2018.csv", sep = ',')
-
-register <- dplyr::bind_rows(register2018, register2019, register2020, register2021, register2022)
-
-register_long <- register %>%
-  pivot_longer(cols = c('Males', 'Females'), names_to = "Gender.group", values_to = "Gender.count")
-
-register_long <- register_long %>%
-  mutate(Population.size = case_when(Year == '2018' ~ 2135347,
-                            Year == '2019' ~ 2133398,
-                            Year == '2020' ~ 2046297,
-                            Year == '2021' ~ 2133908,
-                            Year == '2022' ~ 2180180))
-
-
-register_long <- register_long %>%
-  mutate(Population.proportion = Gender.count/Population.size)
-
-#-------------------------------------------------------------------------------
-
-
-# save the output of cross-tabulation of 'occupation' and 'gender'
-cross_class2018 <- as.data.frame(unclass(table(cdata2018$lisco_1, cdata2018$sukup)))
-colnames(cross_class2018) <- c('males', 'females')
-cross_class2018$Occupational.group <- rownames(cross_class2018)
-cross_class2018$Year <- 2018
-
-cross_class2019 <- as.data.frame(unclass(table(cdata2019$lisco_1, cdata2019$sukup)))
-colnames(cross_class2019) <- c('males', 'females')
-cross_class2019$Occupational.group <- rownames(cross_class2019)
-cross_class2019$Year <- 2019
-
-
-cross_class2020 <- as.data.frame(unclass(table(cdata2020$lisco_1, cdata2020$sukup)))
-colnames(cross_class2020) <- c('males', 'females')
-cross_class2020$Occupational.group <- rownames(cross_class2020)
-cross_class2020$Year <- 2020
-
-
-cross_class2021 <- as.data.frame(unclass(table(cdata2021$lisco_1, cdata2021$sukup)))
-colnames(cross_class2021) <- c('males', 'females')
-cross_class2021$Occupational.group <- rownames(cross_class2021)
-cross_class2021$Year <- 2021
-
-
-cross_class2022 <- as.data.frame(unclass(table(cdata2022$lisco_1, cdata2022$sukup)))
-colnames(cross_class2022) <- c('males', 'females')
-cross_class2022$Occupational.group <- rownames(cross_class2022)
-cross_class2022$Year <- 2022
-
-
-sample <- dplyr::bind_rows(cross_class2018, cross_class2019, cross_class2020, cross_class2021, cross_class2022)
-
-sample_long <- sample %>%
-  pivot_longer(cols = c('males', 'females'), names_to = "gender.group", values_to = "gender.count")
-
-
-sample_long <- sample_long %>%
-  mutate(sample.size = case_when(Year == '2018' ~ nrow(cdata2018),
-                                 Year == '2019' ~ nrow(cdata2019),
-                                 Year == '2020' ~ nrow(cdata2020),
-                                 Year == '2021' ~ nrow(cdata2021),
-                                 Year == '2022' ~ nrow(cdata2022)))
-
-sample_long <- sample_long %>%
-  mutate(gender.group = gender.group %>%
-           factor() %>%
-           fct_recode("Males" = "males",
-                      "Females" = "females"))
-sample_long <- sample_long %>% rename(Gender.group = gender.group)
-
-merged_sample <- merge(register_long, sample_long)
-
-merged_sample$weight <- merged_sample$Population.proportion/merged_sample$gender.count
-
-
-
-#----------------------------------------------------
-
-weight <- merged_sample[c(1, 2, 3, 9)]
-
-weight <- weight %>%
-  mutate(Gender.group = Gender.group %>%
-           factor() %>%
-           fct_recode("1" = "Males",
-                      "2" = "Females"))
-
-
-data <- merge(data, weight,
-              by.x = c("sukup", "lisco_1", "year"),
-              by.y = c("Gender.group", "Occupational.group", "Year"))
-            
