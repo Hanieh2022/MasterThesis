@@ -408,33 +408,21 @@ data <- merge(data, weight,
 
 #-------------------------------------------------------------------------------
 
-# calculate work complexity with weight
-data$weighted_autonomy <- data$autonomy*data$weight
-
+# calculate overall work complexity and dimensions with weight
 data %>% 
   group_by(year) %>%
-  summarise(weighted_autonomy_sum = sum(weighted_autonomy, na.rm=TRUE))
+  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
+            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
+            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
+            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
 
 
-data$weighted_skill_building <- data$skill_building*data$weight
 
-data %>% 
-  group_by(year) %>%
-  summarise(weighted_sb_sum = sum(weighted_skill_building, na.rm=TRUE))
-
-
-data$weighted_collaborative_work <- data$collaborative_work*data$weight
-
-data %>% 
-  group_by(year) %>%
-  summarise(weighted_cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
-
-      
-data$weighted_work_complexity <- rowMeans(data[,35:37], na.rm = TRUE)
-
-data %>% 
-  group_by(year) %>%
-  summarise(weighted_wc_sum = sum(weighted_work_complexity, na.rm=TRUE))
+# claculate share of each dimension in WC average
+data %>%
+  summarise(auto_share = sum(weighted_autonomy, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3,
+            sb_share = sum(weighted_skill_building, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3,
+            cw_share = sum(weighted_collaborative_work, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3)
 
 #-------------------------------------------------------------------------------
 
@@ -537,32 +525,24 @@ corrplot(vis_data, method = 'square', order = 'FPC', type = 'upper', diag = FALS
          tl.cex = 0.7, tl.col = "black")
 #-------------------------------------------------------------------------------
 
-means <- data %>%
+# show WC with bar plot
+sum_wc <- data %>%
   group_by(year) %>%
-  summarise(work_complexity=mean(work_complexity, na.rm=TRUE),
-            collaborative_work=mean(collaborative_work, na.rm=TRUE),
-            skill_building=mean(skill_building, na.rm=TRUE),
-            autonomy=mean(autonomy, na.rm=TRUE))
+  summarise(work_complexity_sum=sum(weighted_work_complexity, na.rm=TRUE))
 
 
-line_thickness = 0.75
+line_thickness = 0.90
 point_size = 2
 
-ggplot(means, aes(x=year, group=1)) +
-  geom_line(aes(y=work_complexity, color="Work complexity"), size=line_thickness) +
-  geom_point(aes(y=work_complexity, color="Work complexity"), size=point_size) +
-  geom_line(aes(y=collaborative_work, color="Collaborative work"), size=line_thickness) +
-  geom_point(aes(y=collaborative_work, color="Collaborative work"), size=point_size) +
-  geom_line(aes(y=skill_building, color="Continuous skill-building"),size=line_thickness)+
-  geom_point(aes(y=skill_building, color="Continuous skill-building"), size=point_size) +
-  geom_line(aes(y=autonomy, color="Level of autonomy"), size=line_thickness) +
-  geom_point(aes(y=autonomy, color="Level of autonomy"), size=point_size) +
-  scale_color_manual(name = "", values = c("Work complexity" = 'black',
-                                           "Collaborative work" = 'darkblue',
-                                           "Continuous skill-building" = 'darkgreen',
-                                           "Level of autonomy" = 'orange')) +
+ggplot(sum_wc, aes(x=year, group=1)) +
+  geom_line(aes(y=work_complexity_sum, color="Work complexity"), size=line_thickness) +
+  geom_point(aes(y=work_complexity_sum, color="Work complexity"), size=point_size) +
+  scale_color_manual(name = "", values = c("Work complexity" = 'black')) +
   labs(x="Year", y = "Average")
+  #geom_text(aes(label = round(work_complexity_sum, 3)), hjust = 1.4, vjust = 0.4, size = 4)
 
+
+#------------------------------------------------------------------------------
 
 
 sums <- data %>%
@@ -596,23 +576,31 @@ group_by(lisco_1) %>%
 summarise(Sum_test = sum(weighted_work_complexity, na.rm=TRUE))
 
 
-ggplot(data, aes(x=work_complexity)) +
+#ggplot(data, aes(x=work_complexity)) +
   geom_histogram(color="black", fill = "gray") +
   labs(x="Work complexity", y = "Frequency")
 
 
-ggplot(data, aes(x = year, y = work_complexity, color = year)) +
+ggplot(data, aes(x = year, y = weighted_work_complexity, color = year)) +
   geom_boxplot(colour = "#1F3552", fill = "#4271AE", alpha = 0.7, width = 0.5) +
-  stat_summary(fun = mean, geom = "pointrange", shape = 18, size = 0.9, 
-               color = "darkorange", fill = "darkorange") +
-  labs(x="Year", y = "Work complexity") +
-  geom_text(data = means, aes(x = group, y = mean_value + 0.2, label = round(mean_value, 2)))
+  #stat_summary(fun = su, geom = "pointrange", shape = 18, size = 0.9, 
+               #color = "darkorange", fill = "darkorange") +
+  labs(x="Year", y = "Work complexity") 
+  #geom_text(data = means, aes(x = group, y = mean_value + 0.2, label = round(mean_value, 2)))
 
 #-------------------------------------------------------------------------------
 
-# regression analysis
-a <- lm(work_complexity ~ as_factor(sukup) + as_factor(age), data = data, weight = weight)
-      
-summary(a)
+# regression analysis with own calculated weight
+model <- lm(work_complexity ~ as_factor(sukup) + as_factor(age), data = data21_22, weight = weight)
+summary(model)
 
+
+
+# regression analysis with original weight
+# Create subsets based on year
+data21_22 <- data[data$year %in% c(2021, 2022), ]
+data21_22$tb_paino <- as.numeric(data21_22$tb_paino)
+
+model1 <- lm(work_complexity ~ as_factor(sukup) + as_factor(age), data = data21_22, weight = tb_paino)
+summary(model1)
 
