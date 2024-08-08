@@ -16,6 +16,9 @@ library(lavaan)
 library(psych) 
 library(semPlot)
 library(summarytools)
+library(ggfortify)
+library(weights)
+library(car)
 
 
 #-------------------------------------------------------------------------------
@@ -408,13 +411,13 @@ data <- merge(data, weight,
 
 #-------------------------------------------------------------------------------
 
-# calculate overall work complexity and dimensions with weight
+# calculate overall work complexity and dimensions per year
 data %>% 
   group_by(year) %>%
-  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
-            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
-            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
-            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
 
 
 
@@ -423,6 +426,27 @@ data %>%
   summarise(auto_share = sum(weighted_autonomy, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3,
             sb_share = sum(weighted_skill_building, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3,
             cw_share = sum(weighted_collaborative_work, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3)
+
+
+
+# calculate overall work complexity and dimensions for gender groups
+data %>% 
+  group_by(sukup) %>%
+  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+
+
+
+# calculate overall work complexity and dimensions for age groups
+data %>% 
+  group_by(age) %>%
+  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+t.t
 
 #-------------------------------------------------------------------------------
 
@@ -604,3 +628,50 @@ data21_22$tb_paino <- as.numeric(data21_22$tb_paino)
 model1 <- lm(work_complexity ~ as_factor(sukup) + as_factor(age), data = data21_22, weight = tb_paino)
 summary(model1)
 
+model2 <- lm(autonomy ~ as_factor(sukup) + as_factor(age), data = data21_22, weight = tb_paino)
+summary(model2)
+
+model3 <- lm(skill_building ~ as_factor(sukup) + as_factor(age), data = data21_22, weight = tb_paino)
+summary(model3)
+
+model4 <- lm(collaborative_work ~ as_factor(sukup) + as_factor(age), data = data21_22, weight = tb_paino)
+summary(model4)
+
+
+# check diagnostics plots
+autoplot(model1)
+return
+
+ggplot(data, aes(x = sukup, y = work_complexity)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_jitter()
+
+ggplot(data, aes(x = ika, y = work_complexity)) +
+  geom_point() +
+  geom_smooth() +
+  geom_jitter()
+
+data$weighted_work_complexity <- data$work_complexity*data$weight
+
+t.test(data$work_complexity ~ data$sukup, data = data)
+summary(aov(weighted_work_complexity ~ age, data = data))
+
+data_design <- svydesign(ids=~0, strata=NULL, weights=~weight,
+                         nest=TRUE, data=data)
+svyttest(work_complexity ~ sukup, design = data_design)
+anova.svyglm()
+h <- aov(weighted_work_complexity ~ age, data = data)
+summary(h)
+
+
+ggplot(data, aes(x = work_complexity)) +
+  geom_histogram() +
+  facet_wrap(vars(age))
+
+
+leveneTest(work_complexity ~ as_factor(sukup), data = data)
+leveneTest(work_complexity ~ as_factor(age), data = data)
+
+# Perform Welch's ANOVA
+oneway.test(work_complexity ~ as_factor(age), data = data, var.equal = FALSE)
