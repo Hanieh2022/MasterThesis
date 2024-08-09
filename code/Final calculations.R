@@ -391,11 +391,11 @@ sample_long <- sample_long %>% rename(Gender.group = gender.group)
 merged_sample <- merge(register_long, sample_long)
 
 merged_sample$weight <- merged_sample$Population.proportion/merged_sample$joint
+merged_sample$scaled_weight <- merged_sample$weight*1000
 
 
 
-
-weight <- merged_sample[c(1, 2, 3, 9)]
+weight <- merged_sample[c(1, 2, 3, 9, 10)]
 
 weight <- weight %>%
   mutate(Gender.group = Gender.group %>%
@@ -409,44 +409,52 @@ data <- merge(data, weight,
               by.y = c("Gender.group", "Occupational.group", "Year"))
 
 
+data$weighted_autonomy <- data$autonomy*data$scaled_weight
+data$weighted_skill_building <- data$skill_building*data$scaled_weight
+data$weighted_collaborative_work <- data$collaborative_work*data$scaled_weight
+data$weighted_work_complexity <- rowMeans(data[,37:39], na.rm=TRUE)
+
+
+
 #-------------------------------------------------------------------------------
 
 # calculate overall work complexity and dimensions per year
 data %>% 
   group_by(year) %>%
-  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = scaled_weight),
+            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = scaled_weight),
+            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = scaled_weight),
+            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = scaled_weight))
 
-
-
-# claculate share of each dimension in WC average
-data %>%
-  summarise(auto_share = sum(weighted_autonomy, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3,
-            sb_share = sum(weighted_skill_building, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3,
-            cw_share = sum(weighted_collaborative_work, na.rm = TRUE)/sum(weighted_work_complexity, na.rm = TRUE)*100*1/3)
 
 
 
 # calculate overall work complexity and dimensions for gender groups
 data %>% 
   group_by(sukup) %>%
-  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = scaled_weight),
+            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = scaled_weight),
+            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = scaled_weight),
+            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = scaled_weight))
+
+
+data %>% 
+  group_by(sukup) %>%
+  summarise(wc_mean = sd(work_complexity, na.rm=TRUE),
+            auto_mean = sd(autonomy, na.rm=TRUE),
+            sb_mean = sd(skill_building, na.rm=TRUE),
+            cw_mean = sd(collaborative_work, na.rm=TRUE))
 
 
 
 # calculate overall work complexity and dimensions for age groups
 data %>% 
   group_by(age) %>%
-  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
-t.t
+  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = scaled_weight),
+            auto_mean = weighted.mean(autonomy, na.rm=TRUE, w = scaled_weight),
+            sb_mean = weighted.mean(skill_building, na.rm=TRUE, w = scaled_weight),
+            cw_mean = weighted.mean(collaborative_work, na.rm=TRUE, w = scaled_weight))
+
 
 #-------------------------------------------------------------------------------
 
@@ -612,6 +620,32 @@ ggplot(data, aes(x = year, y = weighted_work_complexity, color = year)) +
   labs(x="Year", y = "Work complexity") 
   #geom_text(data = means, aes(x = group, y = mean_value + 0.2, label = round(mean_value, 2)))
 
+
+
+# check diagnostics plots
+autoplot(model1)
+return
+
+
+# check linearity
+ggplot(data, aes(x = sukup, y = collaborative_work)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_jitter()
+
+
+ggplot(data, aes(x = age, y = weighted_work_complexity)) +
+  geom_point() +
+  geom_smooth() +
+  geom_jitter()
+
+
+# chech normality
+ggplot(data, aes(x = skill_building)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(sukup))
+
+
 #-------------------------------------------------------------------------------
 
 # regression analysis with own calculated weight
@@ -624,6 +658,11 @@ summary(model)
 # Create subsets based on year
 data21_22 <- data[data$year %in% c(2021, 2022), ]
 data21_22$tb_paino <- as.numeric(data21_22$tb_paino)
+
+
+data22 <- data[data$year %in% c(2022), ]
+data22$tb_paino <- as.numeric(data22$tb_paino)
+
 
 model1 <- lm(work_complexity ~ as_factor(sukup) + as_factor(age), data = data21_22, weight = tb_paino)
 summary(model1)
@@ -638,36 +677,31 @@ model4 <- lm(collaborative_work ~ as_factor(sukup) + as_factor(age), data = data
 summary(model4)
 
 
-# check diagnostics plots
-autoplot(model1)
-return
 
-ggplot(data, aes(x = sukup, y = work_complexity)) +
-  geom_point() +
-  geom_smooth(method = "lm") +
-  geom_jitter()
 
-ggplot(data, aes(x = ika, y = work_complexity)) +
-  geom_point() +
-  geom_smooth() +
-  geom_jitter()
 
 data$weighted_work_complexity <- data$work_complexity*data$weight
 
-t.test(data$work_complexity ~ data$sukup, data = data)
+t.test(weighted_work_complexity ~ sukup, data = data)
 summary(aov(weighted_work_complexity ~ age, data = data))
 
-data_design <- svydesign(ids=~0, strata=NULL, weights=~weight,
+data_design <- svydesign(ids=~0, strata=NULL, weights=~scaled_weight,
                          nest=TRUE, data=data)
+
+data_design2 <- svydesign(ids=~0, strata=NULL, weights=~tb_paino,
+                         nest=TRUE, data=data21_22)
+
+data22 %>% 
+  group_by(age) %>%
+  summarise(wc_mean = svymean(~work_complexity, design = data_design2))
+            
+
+
 svyttest(work_complexity ~ sukup, design = data_design)
 anova.svyglm()
-h <- aov(weighted_work_complexity ~ age, data = data)
+h <- aov(work_complexity ~ age, data = data)
 summary(h)
 
-
-ggplot(data, aes(x = work_complexity)) +
-  geom_histogram() +
-  facet_wrap(vars(age))
 
 
 leveneTest(work_complexity ~ as_factor(sukup), data = data)
@@ -675,3 +709,95 @@ leveneTest(work_complexity ~ as_factor(age), data = data)
 
 # Perform Welch's ANOVA
 oneway.test(work_complexity ~ as_factor(age), data = data, var.equal = FALSE)
+
+
+#------------------------------------------------------------------------------
+
+# Sadra solusion
+S1 <- data %>% 
+  filter(year == "2018") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
+            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
+            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
+            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+
+S2 <- data %>% 
+  filter(year == "2019") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
+            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
+            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
+            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+
+S3 <- data %>% 
+  filter(year == "2020") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
+            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
+            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
+            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+
+S4 <- data %>% 
+  filter(year == "2021") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
+            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
+            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
+            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+
+S5 <- data %>% 
+  filter(year == "2022") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
+            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
+            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
+            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+
+
+(S1 + S2 + S3 + S4 + S5)/5
+
+#_____________________________________________________________________________
+
+S11 <- data %>% 
+  filter(year == "2018") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+
+S22 <- data %>% 
+  filter(year == "2019") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+
+S33 <- data %>% 
+  filter(year == "2020") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+
+S44 <- data %>% 
+  filter(year == "2021") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+
+S55 <- data %>% 
+  filter(year == "2022") %>%
+  group_by(sukup) %>%
+  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
+            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
+            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
+            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+
+
+(S11 + S22 + S33 + S44 + S55)/5
