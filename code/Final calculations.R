@@ -713,91 +713,136 @@ oneway.test(work_complexity ~ as_factor(age), data = data, var.equal = FALSE)
 
 #------------------------------------------------------------------------------
 
-# Sadra solusion
-S1 <- data %>% 
-  filter(year == "2018") %>%
+# Gender
+
+# means
+data %>% 
   group_by(sukup) %>%
-  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
-            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
-            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
-            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
-
-S2 <- data %>% 
-  filter(year == "2019") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
-            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
-            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
-            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
-
-S3 <- data %>% 
-  filter(year == "2020") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
-            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
-            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
-            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
-
-S4 <- data %>% 
-  filter(year == "2021") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
-            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
-            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
-            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
-
-S5 <- data %>% 
-  filter(year == "2022") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = sum(weighted_work_complexity, na.rm=TRUE),
-            auto_sum = sum(weighted_autonomy, na.rm=TRUE),
-            sb_sum = sum(weighted_skill_building, na.rm=TRUE),
-            cw_sum = sum(weighted_collaborative_work, na.rm=TRUE))
+  summarise(wc_mean = mean(work_complexity, na.rm=TRUE),
+            auto_mean = mean(autonomy, na.rm=TRUE),
+            sb_mean = mean(skill_building, na.rm=TRUE),
+            cw_mean = mean(collaborative_work, na.rm=TRUE))
 
 
-(S1 + S2 + S3 + S4 + S5)/5
+# t-test
+## work complexity
+### check normality
+ggplot(data, aes(x = work_complexity)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(sukup))  # is normal
 
-#_____________________________________________________________________________
-
-S11 <- data %>% 
-  filter(year == "2018") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
-
-S22 <- data %>% 
-  filter(year == "2019") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
-
-S33 <- data %>% 
-  filter(year == "2020") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
-
-S44 <- data %>% 
-  filter(year == "2021") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
-
-S55 <- data %>% 
-  filter(year == "2022") %>%
-  group_by(sukup) %>%
-  summarise(wc_sum = weighted.mean(work_complexity, na.rm=TRUE, w = weight),
-            auto_sum = weighted.mean(autonomy, na.rm=TRUE, w = weight),
-            sb_sum = weighted.mean(skill_building, na.rm=TRUE, w = weight),
-            cw_sum = weighted.mean(collaborative_work, na.rm=TRUE, w = weight))
+### check homogeneity
+leveneTest(work_complexity ~ as_factor(sukup), data = data)  # is homogeneous
 
 
-(S11 + S22 + S33 + S44 + S55)/5
+t.test(work_complexity ~ as_factor(sukup), data = data)  # sig
+
+
+## autonomy
+### check normality
+ggplot(data, aes(x = autonomy)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(sukup))  # is normal
+
+### check homogeneity
+leveneTest(autonomy ~ as_factor(sukup), data = data)  # is homogeneous
+
+### standard t.test
+t.test(autonomy ~ as_factor(sukup), data = data)  # sig
+
+
+## skill-building
+### check normality
+ggplot(data, aes(x = skill_building)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(sukup))  # is normal
+
+### check homogeneity
+leveneTest(skill_building ~ as_factor(sukup), data = data)  # not homogeneous
+
+
+### Welch's t-test
+t.test(skill_building ~ as_factor(sukup), data = data, var.equal = FALSE) # sig
+
+
+## collaborative work
+### check normality
+ggplot(data, aes(x = collaborative_work)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(sukup))  
+shapiro.test(data21_22$collaborative_work) # is normal
+
+### check homogeneity
+leveneTest(collaborative_work ~ as_factor(sukup), data = data)  # is homogeneous
+
+### standard t.test
+t.test(collaborative_work ~ as_factor(sukup), data = data)  # sig
+
+
+
+#------------------------------------------------------------------------------
+
+# Age
+
+# means
+data %>% 
+  group_by(age) %>%
+  summarise(wc_mean = mean(work_complexity, na.rm=TRUE),
+            auto_mean = mean(autonomy, na.rm=TRUE),
+            sb_mean = mean(skill_building, na.rm=TRUE),
+            cw_mean = mean(collaborative_work, na.rm=TRUE))
+
+
+# t-test
+## work complexity
+### check normality
+ggplot(data, aes(x = work_complexity)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(age))  # is normal
+
+### check homogeneity
+leveneTest(work_complexity ~ as_factor(age), data = data)  # not homogeneous
+
+### Welch's ANOVA
+oneway.test(work_complexity ~ as_factor(age), data = data, var.equal = FALSE) # sig
+
+
+## autonomy
+### check normality
+ggplot(data, aes(x = autonomy)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(age))  # is normal
+
+### check homogeneity
+leveneTest(autonomy ~ as_factor(age), data = data)  # not homogeneous
+
+### Welch's ANOVA
+oneway.test(autonomy ~ as_factor(age), data = data, var.equal = FALSE) # not sig
+
+
+## skill-building
+### check normality
+ggplot(data, aes(x = skill_building)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(age))  
+shapiro.test(data21_22$skill_building) # is normal
+
+### check homogeneity
+leveneTest(skill_building ~ as_factor(age), data = data)  # is homogeneous
+
+### standard anova
+ano1 <- aov(collaborative_work ~ as_factor(sukup), data = data)  
+summary(ano1)  # sig
+
+
+## collaborative work
+### check normality
+ggplot(data, aes(x = collaborative_work)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.3) +
+  facet_wrap(vars(age))   # is normal
+
+### check homogeneity
+leveneTest(collaborative_work ~ as_factor(age), data = data)  # not homogeneous
+
+### Welch's ANOVA
+oneway.test(collaborative_work ~ as_factor(age), data = data, var.equal = FALSE) # sig
