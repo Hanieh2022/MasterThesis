@@ -307,6 +307,7 @@ summary(data$work_complexity)   # mean: 0.4711
 write.table(data, file = "../data/final_data.txt", row.names = FALSE, sep = ',')
 
 
+
 #-------------------------------------------------------------------------------
 
 # weighting data
@@ -412,7 +413,7 @@ data <- merge(data, weight,
 data$weighted_autonomy <- data$autonomy*data$scaled_weight
 data$weighted_skill_building <- data$skill_building*data$scaled_weight
 data$weighted_collaborative_work <- data$collaborative_work*data$scaled_weight
-data$weighted_work_complexity <- rowMeans(data[,37:39], na.rm=TRUE)
+data$weighted_work_complexity <- rowMeans(data[,36:38], na.rm=TRUE)
 
 
 
@@ -558,50 +559,54 @@ corrplot(vis_data, method = 'square', order = 'FPC', type = 'upper', diag = FALS
 #-------------------------------------------------------------------------------
 
 # show WC with bar plot
-sum_wc <- data %>%
+mean_wc <- data %>%
   group_by(year) %>%
-  summarise(work_complexity_sum=sum(weighted_work_complexity, na.rm=TRUE))
+  summarise(wc_mean = weighted.mean(work_complexity, na.rm=TRUE, w = scaled_weight))
 
 
 line_thickness = 0.90
 point_size = 2
 
-ggplot(sum_wc, aes(x=year, group=1)) +
-  geom_line(aes(y=work_complexity_sum, color="Work complexity"), size=line_thickness) +
-  geom_point(aes(y=work_complexity_sum, color="Work complexity"), size=point_size) +
+ggplot(mean_wc, aes(x=year, group=1)) +
+  geom_line(aes(y=wc_mean, color="Work complexity"), size=line_thickness) +
+  geom_point(aes(y=wc_mean, color="Work complexity"), size=point_size) +
   scale_color_manual(name = "", values = c("Work complexity" = 'black')) +
-  labs(x="Year", y = "Average")
-  #geom_text(aes(label = round(work_complexity_sum, 3)), hjust = 1.4, vjust = 0.4, size = 4)
+  labs(x="Year", y = "Average") +
+  geom_text(aes(y=wc_mean, label = round(wc_mean, 3)), hjust = 1.4, vjust = 0.4, size = 3)
 
 
 #------------------------------------------------------------------------------
 
 
-sums <- data %>%
+means <- data %>%
   group_by(year) %>%
-  summarise(work_complexity=sum(weighted_work_complexity, na.rm=TRUE),
-            collaborative_work=sum(weighted_collaborative_work, na.rm=TRUE),
-            skill_building=sum(weighted_skill_building, na.rm=TRUE),
-            autonomy=sum(weighted_autonomy, na.rm=TRUE))
+  summarise(work_complexity=weighted.mean(work_complexity, na.rm=TRUE, w = scaled_weight),
+            collaborative_work=weighted.mean(collaborative_work, na.rm=TRUE, w = scaled_weight),
+            skill_building=weighted.mean(skill_building, na.rm=TRUE, w = scaled_weight),
+            autonomy=weighted.mean(autonomy, na.rm=TRUE, w = scaled_weight))
 
 
 line_thickness = 0.75
 point_size = 2
 
-ggplot(sums, aes(x=year, group=1)) +
+ggplot(means, aes(x=year, group=1)) +
   geom_line(aes(y=work_complexity, color="Work complexity"), size=line_thickness) +
   geom_point(aes(y=work_complexity, color="Work complexity"), size=point_size) +
   geom_line(aes(y=collaborative_work, color="Collaborative work"), size=line_thickness) +
   geom_point(aes(y=collaborative_work, color="Collaborative work"), size=point_size) +
-  geom_line(aes(y=skill_building, color="Continuous skill-building"),size=line_thickness)+
+  geom_line(aes(y=skill_building, color="Continuous skill-building"),size=line_thickness) +
   geom_point(aes(y=skill_building, color="Continuous skill-building"), size=point_size) +
   geom_line(aes(y=autonomy, color="Level of autonomy"), size=line_thickness) +
   geom_point(aes(y=autonomy, color="Level of autonomy"), size=point_size) +
   scale_color_manual(name = "", values = c("Work complexity" = 'black',
                                            "Collaborative work" = 'darkblue',
                                            "Continuous skill-building" = 'darkgreen',
-                                           "Level of autonomy" = 'orange')) +
-  labs(x="Year", y = "Average")
+                                           "Level of autonomy" = 'darkorange')) +
+  labs(x="Year", y = "Average") +
+  geom_text(aes(y=autonomy, label = round(autonomy, 3)), hjust = 1.4, vjust = 1.4, size = 2.5, color='darkorange') +
+  geom_text(aes(y=skill_building, label = round(skill_building, 3)), hjust = 1.4, vjust = 1.4, size = 2.5, color='darkgreen') +
+  geom_text(aes(y=collaborative_work, label = round(collaborative_work, 3)), hjust = 1.4, vjust = 1.4, size = 2.5, color='darkblue')
+
 
 data %>% 
 group_by(lisco_1) %>%
